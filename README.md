@@ -3,7 +3,7 @@
 # Wazuh 설치 가이드
 
 ## 구성 요소 및 버전
-- hypercloud-api-server
+- wazuh-indexer
 	- image: [tmaxcloudck/hypercloud-api-server:b5.0.26.6](https://hub.docker.com/repository/docker/tmaxcloudck/hypercloud-api-server)
 	- git: [https://github.com/tmax-cloud/hypercloud-api-server](https://github.com/tmax-cloud/hypercloud-api-server)
 - hypercloud-single-operator
