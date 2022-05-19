@@ -1,5 +1,3 @@
-
-
 # Wazuh 설치 가이드
 
 ## 구성 요소 및 버전
@@ -9,223 +7,209 @@
 	- image: [wazuh/wazuh-dashboard:4.3.1](https://hub.docker.com/r/wazuh/wazuh-dashboard)
 - wazuh-managers
 	- image: [wazuh/wazuh-manager:4.3.1](https://hub.docker.com/r/wazuh/wazuh-manager)
-## Prerequisite
-- 필수 패키지
-  - yq, sshpass, kustomize
-  - 수동 설치 가이드
-    - 버전 설정
-	  ```
-	  $ YQ_VERSION=v4.5.0
-	  $ KUSTOMIZE_VERSION=v3.8.5
-	  ```
-    - yq
-	  ```
-	  $ sudo wget https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_amd64 -O /usr/local/bin/yq &&\
-      sudo chmod +x /usr/local/bin/yq
-	  ```
-	- kustomize
-	  ```
-	  $ sudo curl -L -O "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2F${KUSTOMIZE_VERSION}/kustomize_${KUSTOMIZE_VERSION}_linux_amd64.tar.gz"
-      $ sudo tar -xzvf "kustomize_${KUSTOMIZE_VERSION}_linux_amd64.tar.gz"
-      $ sudo chmod +x kustomize
-      $ sudo mv kustomize /usr/local/bin/.
-      $ sudo rm -f "kustomize_${KUSTOMIZE_VERSION}_linux_amd64.tar.gz"
-	  ```
 
-- 필수 모듈  
-  - [RookCeph](https://github.com/tmax-cloud/hypersds-wiki/)
-  - [HyperAuth](https://github.com/tmax-cloud/install-hyperauth)
-  - [CertManager](https://github.com/tmax-cloud/install-cert-manager-temp/tree/5.0)
+## Pre-requisites
 
-- hypercloud-multi-operator 설치시 필요 모듈  
-  - [Ingress](https://github.com/tmax-cloud/install-ingress/tree/5.0)
-  - [TemplateServiceBroker](https://github.com/tmax-cloud/install-tsb/tree/tsb-5.0)
-  - [CatalogController](https://github.com/tmax-cloud/install-catalog/tree/5.0)
-  - [CAPI](https://github.com/tmax-cloud/install-CAPI/tree/5.0)
-  - [Federation](https://github.com/tmax-cloud/install-federation/tree/5.0)
-  
-- hyperauth 사전 작업 (Hypercloud 사용자에 default 그룹 추가)
-  - Hypercloud를 서비스할 realm 선택
-  - hypercloud5 그룹 생성 (hypercloud5 동일하게 그룹을 생성해야 함)
-  ![](https://github.com/tmax-cloud/install-hypercloud/blob/5.0/figure/create-hypercloud5-group.png)
-  
-  - hypercloud5 그룹을 default로 설정                             
-  ![](https://github.com/tmax-cloud/install-hypercloud/blob/5.0/figure/set-hypercloud5-as-default.png)
-  
-  - client-scope에서 group에 대한 client-scope 생성
-  ![](https://github.com/tmax-cloud/install-hypercloud/blob/5.0/figure/create-client-scope.PNG)
-  
-  - 위에서 만든 client-scope을 hypercloud5 client에 들어가서 추가
-  ![](https://github.com/tmax-cloud/install-hypercloud/blob/5.0/figure/add-client-scope.PNG)
+- Kubernetes 클러스터 
+- Storage & Network 플러그인
 
-## 폐쇄망 구축 가이드
-- Dockerhub의 이미지를 사용할 수 없는 경우, 아래의 과정을 통해 이미지를 준비합니다.
-- 그 후, hypercloud.config의 REGISTRY의 변수에 이미지 저장소를 넣고 install.sh을 실행하면 됩니다.  
-  - 작업 디렉토리 생성 및 환경 설정
-    ``` bash
-	$ mkdir -p ~/hypercloud-install
-	$ export HYPERCLOUD_HOME=~/hypercloud-install
-	$ export HPCD_API_SERVER_VERSION=5.0.26.6
-	$ export HPCD_SINGLE_OPERATOR_VERSION=5.0.25.16
-	$ export HPCD_MULTI_OPERATOR_VERSION=5.0.25.14
-	$ export HPCD_MULTI_AGENT_VERSION=5.0.25.14
-	$ export HPCD_POSTGRES_VERSION=5.0.0.1
-	$ cd $HYPERCLOUD_HOME
-	```
-  - 외부 네트워크 통신이 가능한 환경에서 이미지 다운로드
-    ``` bash
-	$ sudo docker pull tmaxcloudck/hypercloud-api-server:b${HPCD_API_SERVER_VERSION}
-	$ sudo docker save tmaxcloudck/hypercloud-api-server:b${HPCD_API_SERVER_VERSION} > api-server_b${HPCD_API_SERVER_VERSION}.tar
+## Overview
 
-	$ sudo docker pull gcr.io/kubebuilder/kube-rbac-proxy:v0.5.0
-	$ sudo docker save gcr.io/kubebuilder/kube-rbac-proxy:v0.5.0 > kube-rbac-proxy:v0.5.0.tar
+### StateFulSet and Deployments Controllers
 
-	$ sudo docker pull tmaxcloudck/hypercloud-single-operator:b${HPCD_SINGLE_OPERATOR_VERSION}
-	$ sudo docker save tmaxcloudck/hypercloud-single-operator:b${HPCD_SINGLE_OPERATOR_VERSION} > single-operator_b${HPCD_SINGLE_OPERATOR_VERSION}.tar
+Like a Deployment, a StatefulSet manages Pods that are based on an identical container specification, but it maintains an identity attached to each of its pods. These pods are created from the same specification, but they are not interchangeable: each one has a persistent identifier maintained across any rescheduling.
 
-	$ sudo docker pull tmaxcloudck/hypercloud-multi-operator:b${HPCD_MULTI_OPERATOR_VERSION}
-	$ sudo docker save tmaxcloudck/hypercloud-multi-operator:b${HPCD_MULTI_OPERATOR_VERSION} > multi-operator_b${HPCD_MULTI_OPERATOR_VERSION}.tar
+It is useful for stateful applications like databases that save the data to a persistent storage. The states of each Wazuh manager as well as Elasticsearch are desirable to maintain, so we declare them using StatefulSet to ensure that they maintain their states in every startup.
 
-	$ sudo docker pull tmaxcloudck/postgres-cron:b${HPCD_POSTGRES_VERSION}
-	$ sudo docker save tmaxcloudck/postgres-cron:b${HPCD_POSTGRES_VERSION} > postgres-cron_b${HPCD_POSTGRES_VERSION}.tar
-	```
-  - tar 파일을 폐쇄망 환경으로 이동시킨 후, registry에 이미지 push
-    ``` bash
-	# 이미지 레지스트리 주소
-	$ REGISTRY={IP:PORT}
-	
-	$ sudo docker load < api-server_b${HPCD_API_SERVER_VERSION}.tar
-	$ sudo docker tag tmaxcloudck/hypercloud-api-server:b${HPCD_API_SERVER_VERSION} ${REGISTRY}/tmaxcloudck/hypercloud-api-server:b${HPCD_API_SERVER_VERSION}
-	$ sudo docker push ${REGISTRY}/tmaxcloudck/hypercloud-api-server:b${HPCD_API_SERVER_VERSION}
+Deployments are intended for stateless use and are quite lightweight and seem to be appropriate for Kibana and Nginx, where it is not necessary to maintain the states.
 
-	$ sudo docker load < kube-rbac-proxy:v0.5.0.tar
-	$ sudo docker tag gcr.io/kubebuilder/kube-rbac-proxy:v0.5.0 ${REGISTRY}/gcr.io/kubebuilder/kube-rbac-proxy:v0.5.0
-	$ sudo docker push ${REGISTRY}/gcr.io/kubebuilder/kube-rbac-proxy:v0.5.0
+### Pods
 
-	$ sudo docker load < single-operator_b${HPCD_SINGLE_OPERATOR_VERSION}.tar
-	$ sudo docker tag tmaxcloudck/hypercloud-single-operator:b${HPCD_SINGLE_OPERATOR_VERSION} ${REGISTRY}/tmaxcloudck/hypercloud-single-operator:b${HPCD_SINGLE_OPERATOR_VERSION}
-	$ sudo docker push ${REGISTRY}/tmaxcloudck/hypercloud-single-operator:b${HPCD_SINGLE_OPERATOR_VERSION}
+#### Wazuh master
 
-	$ sudo docker load < multi-operator_b${HPCD_MULTI_OPERATOR_VERSION}.tar
-	$ sudo docker tag tmaxcloudck/hypercloud-multi-operator:b${HPCD_MULTI_OPERATOR_VERSION} ${REGISTRY}/tmaxcloudck/hypercloud-multi-operator:b${HPCD_MULTI_OPERATOR_VERSION}
-	$ sudo docker push ${REGISTRY}/tmaxcloudck/hypercloud-multi-operator:b${HPCD_MULTI_OPERATOR_VERSION}
+This pod contains the master node of the Wazuh cluster. The master node centralizes and coordinates worker nodes, making sure the critical and required data is consistent across all nodes.
+The management is performed only in this node, so the agent registration service (authd) and the API are placed here.
 
-	$ sudo docker load < postgres-cron_b${HPCD_POSTGRES_VERSION}.tar
-	$ sudo docker tag tmaxcloudck/postgres-cron:b${HPCD_POSTGRES_VERSION} ${REGISTRY}/tmaxcloudck/postgres-cron:b${HPCD_POSTGRES_VERSION}
-	$ sudo docker push ${REGISTRY}/tmaxcloudck/postgres-cron:b${HPCD_POSTGRES_VERSION}
-	```
+Details:
+- Image: Docker Hub 'wazuh/wazuh-odfe'
+- Controller: StatefulSet
 
-## Step 0. hypercloud.config 설정
-- 목적 : `hypercloud.config 파일에 설치를 위한 정보 기입`
-- 순서 : 
-	- 환경에 맞는 config 내용 작성
-		- HPCD_MODE
-			- single 단일 혹은 single/multi 전부 설치 여부
-			- ex) single / multi
-		- HPCD_SINGLE_OPERATOR_VERSION
-			- hypercloud-single-operator의 버전
-			- ex) 5.0.25.16
-		- HPCD_MULTI_OPERATOR_VERSION
-			- hypercloud-multi-operator의 버전
-			- ex) 5.0.25.14
-		- HPCD_API_SERVER_VERSION
-			- hypercloud-api-server의 버전
-			- ex) 5.0.26.6
-		- HPCD_POSTGRES_VERSION
-			- postgres의 버전
-			- ex) 5.0.0.1
-		- HPCD_MULTI_AGENT_VERSION
-			- hypercloud-multi-agent의 버전
-			- ex) 5.0.25.14
-		- REGISTRY
-			- 폐쇄망 사용시 image repository의 주소
-			- 폐쇄망 아닐시 {REGISTRY} 그대로 유지
-			- ex) 192.168.6.171:5000
-		- MAIN_MASTER_IP
-			- 메인 마스터 노드의 IP
-			- ex) 192.168.6.171  
-		- INVITATION_TOKEN_EXPIRED_DATE
-			- 클러스터에 사용자 초대 시 초대 만료 시간
-			- ex) 7days, 1hours, 1minutes
-		- KAFKA_ENABLED
-			- KAFKA 사용 여부
-			- ex) "true", "false"
+#### Wazuh worker 0 / 1
 
-		`아래 3개 항목은 마스터 노드 다중화 시에만 수정`  
-		`메인 마스터 노드를 제외한 마스터 노드들의 정보를 순서에 맞춰 작성`
-		- SUB_MASTER_IP
-			- 메인 마스터 노드를 제외한 마스터 노드들의 IP 배열
-			- ex) ("192.168.6.172" "192.168.6.173")
-		- MASTER_NODE_ROOT_USER
-			- 메인 마스터 노드를 제외한 마스터 노드의 루트 유저 이름 배열
-			- ex) ("root1" "root2")
-		- MASTER_NODE_ROOT_PASSWORD
-			- 메인 마스터 노드를 제외한 마스터 노드의 패스워드 배열
-			- ex ) ("passwd111" "passwd222")
+These pods contain a worker node of the Wazuh cluster. They will receive the agent events.
+
+Details:
+- Image: Docker Hub 'wazuh/wazuh-odfe'
+- Controller: StatefulSet
 
 
-	
+#### Elasticsearch
 
-## Step 1. installer 실행
-- 목적 : `설치를 위한 shell script 실행`
-- 비고 : __kafka가 외부 클러스터에 있다면__ shell script 실행 전 해당 클러스터에서 ca 인증서와 키를 발급 받은 뒤, hypercloud-api-server를 설치하는 클러스터에 hypercloud-kafka-secret을 생성해야 한다.
-	1. kafka가 실행되고 있는 클러스터에서 아래 형식을 통해 인증서 발급 받음.  
-		```yaml
-		apiVersion: cert-manager.io/v1
-		kind: Certificate
-		metadata:
-		  name: hypercloud5-api-server-kafka-cert
-		spec:
-		  secretName: hypercloud-kafka-secret
-		  isCA: false
-		  usages:
-		  - digital signature
-		  - key encipherment
-		  - server auth
-		  - client auth
-		  dnsNames:
-		  - "hypercloud.tmaxcloud.org"
-		  - "hypercloud5-api-server-service.hypercloud5-system.svc"
-		  issuerRef:
-		    kind: ClusterIssuer
-		    group: cert-manager.io
-		    name: tmaxcloud-issuer # 해당 환경의 issuer	
-		```
-	2. 생성된 secret에서 인증서 추출
-		```bash
-		$ kubectl get secret hypercloud-kafka-secret -o jsonpath="{['data']['ca\.crt']}" | base64 -d > ca.crt
-		$ kubectl get secret hypercloud-kafka-secret -o jsonpath="{['data']['tls\.crt']}" | base64 -d > tls.crt
-		$ kubectl get secret hypercloud-kafka-secret -o jsonpath="{['data']['tls\.key']}" | base64 -d > tls.key
-		```
-	3. 추출한 파일을 이용해 hypercloud-api-server가 설치될 클러스터에 secret 생성
-		```bash
-		$ kubectl -n hypercloud5-system create secret generic hypercloud-kafka-secret \
-	  		--from-file=ca.crt \
-  			--from-file=tls.crt \
-  			--from-file=tls.key
-		```
+Elasticsearch pod. Used to build an Elasticsearch cluster.
 
-- 순서 : 
-	- 권한 부여 및 실행
-		``` bash
-		$ sudo chmod +x install.sh
-		$ ./install.sh
-		```
+Details:
+- Image: amazon/opendistro-for-elasticsearch
+- Controller: StatefulSet
 
-## 삭제 가이드
-- 목적 : `삭제를 위한 shell script 실행`
-- 순서 : 
-	- 권한 부여 및 실행
-		``` bash
-		$ sudo chmod +x uninstall.sh
-		$ ./uninstall.sh
-		```
+#### Kibana
 
-## multi-operator capi-template version update 가이드
-- 목적 : `multi-operator capi-template version update를 위한 shell script실행`
-- 순서 :
-	- 권한 부여 및 실행
-		``` bash
-		$ sudo chmod +x update-template.sh
-		$ ./update-template.sh
-		```
+Kibana pod. It lets you visualize your Elasticsearch data, along with other features as the Wazuh app.
+
+Details:
+- image: Docker Hub 'wazuh/wazuh-kibana-odfe'
+- Controller: Deployment
+
+### Services
+
+#### Elastic stack
+
+- wazuh-elasticsearch:
+  - Communication for Elasticsearch nodes.
+- elasticsearch:
+  - Elasticsearch API. Used by Kibana to write/read alerts.
+- kibana:
+  - Kibana service. https://wazuh.your-domain.com:443
+
+#### Wazuh
+
+- wazuh:
+  - Wazuh API: wazuh-master.your-domain.com:55000
+  - Agent registration service (authd): wazuh-master.your-domain.com:1515
+- wazuh-workers:
+  - Reporting service: wazuh-manager.your-domain.com:1514
+- wazuh-cluster:
+  - Communication for Wazuh manager nodes.
+
+
+## Deploy
+
+
+### Step 1: Deploy Kubernetes
+
+Deploying the Kubernetes cluster is out of the scope of this guide.
+
+This repository focuses on [AWS](https://aws.amazon.com/) but it should be easy to adapt it to another Cloud provider. In case you are using AWS, we recommend [EKS](https://docs.aws.amazon.com/en_us/eks/latest/userguide/getting-started.html).
+
+
+### Step 2: Create domains to access the services
+
+We recommend creating domains and certificates to access the services. Examples:
+
+- wazuh-master.your-domain.com: Wazuh API and authd registration service.
+- wazuh-manager.your-domain.com: Reporting service.
+- wazuh.your-domain.com: Kibana and Wazuh app.
+
+Note: You can skip this step and the services will be accessible using the Load balancer DNS from the VPC.
+
+### Step 3: Deployment
+
+Clone this repository to deploy the necessary services and pods.
+
+```BASH
+$ git clone https://github.com/wazuh/wazuh-kubernetes.git
+$ cd wazuh-kubernetes
+```
+
+### Step 3.1: Setup SSL certificates
+
+You can generate self-signed certificates for the ODFE cluster using the script at `wazuh/certs/odfe_cluster/generate_certs.sh` or provide your own.
+
+Since Kibana has HTTPS enabled it will require its own certificates, these may be generated with: `openssl req -x509 -batch -nodes -days 365 -newkey rsa:2048 -keyout key.pem -out cert.pem`, there is an utility script at `wazuh/certs/kibana_http/generate_certs.sh` to help with this.
+
+The required certificates are imported via secretGenerator on the `kustomization.yml` file:
+
+    secretGenerator:
+    - name: odfe-ssl-certs
+        files:
+        - certs/odfe_cluster/root-ca.pem
+        - certs/odfe_cluster/node.pem
+        - certs/odfe_cluster/node-key.pem
+        - certs/odfe_cluster/kibana.pem
+        - certs/odfe_cluster/kibana-key.pem
+        - certs/odfe_cluster/admin.pem
+        - certs/odfe_cluster/admin-key.pem
+        - certs/odfe_cluster/filebeat.pem
+        - certs/odfe_cluster/filebeat-key.pem
+    - name: kibana-certs
+        files:
+        - certs/kibana_http/cert.pem
+        - certs/kibana_http/key.pem
+
+### Step 3.2: Apply all manifests using kustomize
+
+We are using the overlay feature of kustomize to create two variants: `eks` and `local-env`, in this guide we're using `eks`. (For a deployment on a local environment check the guide on [local-environment.md](local-environment.md))
+
+You can adjust resources for the cluster on `envs/eks/`, you can tune cpu, memory as well as storage for persistent volumes of each of the cluster objects.
+
+
+By using the kustomization file on the `eks` variant we can now deploy the whole cluster with a single command:
+
+```BASH
+$ kubectl apply -k envs/eks/
+```
+
+### Verifying the deployment
+
+#### Namespace
+
+```BASH
+$ kubectl get namespaces | grep wazuh
+wazuh         Active    12m
+```
+
+#### Services
+
+```BASH
+$ kubectl get services -n wazuh
+NAME                  TYPE           CLUSTER-IP       EXTERNAL-IP        PORT(S)                          AGE
+elasticsearch         ClusterIP      xxx.yy.zzz.24    <none>             9200/TCP                         12m
+kibana                ClusterIP      xxx.yy.zzz.76    <none>             5601/TCP                         11m
+wazuh                 LoadBalancer   xxx.yy.zzz.209   internal-a7a8...   1515:32623/TCP,55000:30283/TCP   9m
+wazuh-cluster         ClusterIP      None             <none>             1516/TCP                         9m
+wazuh-elasticsearch   ClusterIP      None             <none>             9300/TCP                         12m
+wazuh-workers         LoadBalancer   xxx.yy.zzz.26    internal-a7f9...   1514:31593/TCP                   9m
+```
+
+#### Deployments
+
+```BASH
+$ kubectl get deployments -n wazuh
+NAME             DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
+wazuh-kibana     1         1         1            1           11m
+```
+
+#### Statefulsets
+
+```BASH
+$ kubectl get statefulsets -n wazuh
+NAME                   READY   AGE
+wazuh-elasticsearch    3/3     15m
+wazuh-manager-master   1/1     15m
+wazuh-manager-worker   2/2     15m
+```
+
+#### Pods
+
+```BASH
+$ kubectl get pods -n wazuh
+NAME                            READY   STATUS    RESTARTS   AGE
+wazuh-elasticsearch-0           1/1     Running   0          15m
+wazuh-elasticsearch-1           1/1     Running   0          15m
+wazuh-elasticsearch-2           1/1     Running   0          14m
+wazuh-kibana-7c9657f5c5-z95pt   1/1     Running   0          6m18s
+wazuh-manager-master-0          1/1     Running   0          6m10s
+wazuh-manager-worker-0          1/1     Running   0          8m18s
+wazuh-manager-worker-1          1/1     Running   0          8m38s
+```
+
+#### Accessing Kibana
+
+In case you created domain names for the services, you should be able to access Kibana using the proposed domain name: https://wazuh.your-domain.com.
+
+Also, you can access using the External-IP (from the VPC): https://internal-xxx-yyy.us-east-1.elb.amazonaws.com:443
+
+```BASH
+$ kubectl get services -o wide -n wazuh
+NAME                  TYPE           CLUSTER-IP       EXTERNAL-IP                                                                       PORT(S)                          AGE       SELECTOR
+kibana                LoadBalancer   xxx.xx.xxx.xxx   internal-xxx-yyy.us-east-1.elb.amazonaws.com                                      80:31831/TCP,443:30974/TCP       15m       app=wazuh-kibana
+```
