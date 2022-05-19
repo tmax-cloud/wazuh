@@ -44,6 +44,7 @@ Details:
 - Image: wazuh/wazuh-indexer:4.3.1
 - Controller: StatefulSet
 
+
 #### Wazuh dashboard
 
 Wazuh dashboard 컴포넌트 pod (기존의 Kibana). Wazuh indexer 의 데이터를 시각화하고 플러그인을 통해 Wazuh app 제공.
@@ -52,54 +53,40 @@ Details:
 - image: Docker Hub 'wazuh/wazuh-dashboard:4.3.1'
 - Controller: Deployment
 
+
 ### Services
 
-#### Elastic stack
 
-- wazuh-elasticsearch:
-  - Communication for Elasticsearch nodes.
-- elasticsearch:
-  - Elasticsearch API. Used by Kibana to write/read alerts.
-- kibana:
-  - Kibana service. https://wazuh.your-domain.com:443
+#### Indexer stack
+
+- wazuh-indexer:
+  - Wazuh indexer 노드의 통신.
+- indexer:
+  - Wazuh indexer API. Wazuh dashboard 가 alert 읽기/쓰기에 사용.
+- dashboard:
+  - Wazuh dashboard 서비스. https://wazuh.your-domain.com:443
+
 
 #### Wazuh
 
 - wazuh:
   - Wazuh API: wazuh-master.your-domain.com:55000
-  - Agent registration service (authd): wazuh-master.your-domain.com:1515
+  - Agent 등록 서비스 (authd): wazuh-master.your-domain.com:1515
 - wazuh-workers:
-  - Reporting service: wazuh-manager.your-domain.com:1514
+  - Reporting 서비스: wazuh-manager.your-domain.com:1514
 - wazuh-cluster:
-  - Communication for Wazuh manager nodes.
+  - Wazuh manager 노드의 통신.
 
 
 ## Deploy
 
 
-### Step 1: Deploy Kubernetes
+### Step 1: Deployment
 
-Deploying the Kubernetes cluster is out of the scope of this guide.
-
-This repository focuses on [AWS](https://aws.amazon.com/) but it should be easy to adapt it to another Cloud provider. In case you are using AWS, we recommend [EKS](https://docs.aws.amazon.com/en_us/eks/latest/userguide/getting-started.html).
-
-
-### Step 2: Create domains to access the services
-
-We recommend creating domains and certificates to access the services. Examples:
-
-- wazuh-master.your-domain.com: Wazuh API and authd registration service.
-- wazuh-manager.your-domain.com: Reporting service.
-- wazuh.your-domain.com: Kibana and Wazuh app.
-
-Note: You can skip this step and the services will be accessible using the Load balancer DNS from the VPC.
-
-### Step 3: Deployment
-
-Clone this repository to deploy the necessary services and pods.
+Repository 클론.
 
 ```BASH
-$ git clone https://github.com/wazuh/wazuh-kubernetes.git
+$ git clone -b 4.3 --single-branch https://github.com/tmax-cloud/wazuh.git
 $ cd wazuh-kubernetes
 ```
 
