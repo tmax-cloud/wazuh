@@ -15,48 +15,41 @@
 
 ## Overview
 
-### StateFulSet and Deployments Controllers
-
-Like a Deployment, a StatefulSet manages Pods that are based on an identical container specification, but it maintains an identity attached to each of its pods. These pods are created from the same specification, but they are not interchangeable: each one has a persistent identifier maintained across any rescheduling.
-
-It is useful for stateful applications like databases that save the data to a persistent storage. The states of each Wazuh manager as well as Elasticsearch are desirable to maintain, so we declare them using StatefulSet to ensure that they maintain their states in every startup.
-
-Deployments are intended for stateless use and are quite lightweight and seem to be appropriate for Kibana and Nginx, where it is not necessary to maintain the states.
-
 ### Pods
 
-#### Wazuh master
+#### Wazuh manager master
 
-This pod contains the master node of the Wazuh cluster. The master node centralizes and coordinates worker nodes, making sure the critical and required data is consistent across all nodes.
-The management is performed only in this node, so the agent registration service (authd) and the API are placed here.
-
-Details:
-- Image: Docker Hub 'wazuh/wazuh-odfe'
-- Controller: StatefulSet
-
-#### Wazuh worker 0 / 1
-
-These pods contain a worker node of the Wazuh cluster. They will receive the agent events.
+Wazuh 클러스터의 마스터 노드 역할을 하는 pod. 마스터는 Wazuh 워커 노드를 조율해 클러스터 전반의 data consistency 를 보장하도록 동작.
+Agent 등록 서비스와 Wazuh API 서비스 포함
 
 Details:
-- Image: Docker Hub 'wazuh/wazuh-odfe'
+- Image: Docker Hub 'wazuh/wazuh-manager:4.3.1'
 - Controller: StatefulSet
 
 
-#### Elasticsearch
+#### Wazuh manager worker
 
-Elasticsearch pod. Used to build an Elasticsearch cluster.
+Wazuh 클러스터의 워커 노드 역할을 하는 pod. Agent 로부터 이벤트 수신.
 
 Details:
-- Image: amazon/opendistro-for-elasticsearch
+- Image: Docker Hub 'wazuh/wazuh-manager:4.3.1'
 - Controller: StatefulSet
 
-#### Kibana
 
-Kibana pod. It lets you visualize your Elasticsearch data, along with other features as the Wazuh app.
+#### Wazuh indexer
+
+Wazuh indexer 컴포넌트 pod (기존의 Elasticsearch). Wazuh indexer 스택 배포에 사용됨.
 
 Details:
-- image: Docker Hub 'wazuh/wazuh-kibana-odfe'
+- Image: wazuh/wazuh-indexer:4.3.1
+- Controller: StatefulSet
+
+#### Wazuh dashboard
+
+Wazuh dashboard 컴포넌트 pod (기존의 Kibana). Wazuh indexer 의 데이터를 시각화하고 플러그인을 통해 Wazuh app 제공.
+
+Details:
+- image: Docker Hub 'wazuh/wazuh-dashboard:4.3.1'
 - Controller: Deployment
 
 ### Services
