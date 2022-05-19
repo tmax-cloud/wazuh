@@ -4,18 +4,11 @@
 
 ## 구성 요소 및 버전
 - wazuh-indexer
-	- image: [tmaxcloudck/hypercloud-api-server:b5.0.26.6](https://hub.docker.com/repository/docker/tmaxcloudck/hypercloud-api-server)
-	- git: [https://github.com/tmax-cloud/hypercloud-api-server](https://github.com/tmax-cloud/hypercloud-api-server)
-- hypercloud-single-operator
-	- image: [tmaxcloudck/hypercloud-single-operator:b5.0.25.16](https://hub.docker.com/repository/docker/tmaxcloudck/hypercloud-single-operator/general)
-	- git: [https://github.com/tmax-cloud/hypercloud-single-operator](https://github.com/tmax-cloud/hypercloud-single-operator)
-- hypercloud-multi-operator
-	- image: [tmaxcloudck/hypercloud-multi-operator:b5.0.25.14](https://hub.docker.com/repository/docker/tmaxcloudck/hypercloud-multi-operator)
-	- git: [https://github.com/tmax-cloud/hypercloud-multi-operator](https://github.com/tmax-cloud/hypercloud-multi-operator)
-- hypercloud-multi-agent
-	- image: [tmaxcloudck/hypercloud-multi-agent:b5.0.25.0](https://hub.docker.com/r/tmaxcloudck/hypercloud-multi-agent)
-	- git: [https://github.com/tmax-cloud/hypercloud-multi-agent](https://github.com/tmax-cloud/hypercloud-multi-agent)
-
+	- image: [wazuh/wazuh-indexer:4.3.1](https://hub.docker.com/r/wazuh/wazuh-indexer)
+- wazuh-dashboard
+	- image: [wazuh/wazuh-dashboard:4.3.1](https://hub.docker.com/r/wazuh/wazuh-dashboard)
+- wazuh-managers
+	- image: [wazuh/wazuh-manager:4.3.1](https://hub.docker.com/r/wazuh/wazuh-manager)
 ## Prerequisite
 - 필수 패키지
   - yq, sshpass, kustomize
